@@ -1,0 +1,23 @@
+[Unit]
+Description=olspanel - panel hostingowy OpenLiteSpeed
+After=network-online.target mariadb.service lsws.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/olspanel/bin/olspanel serve
+Restart=on-failure
+RestartSec=3
+Environment=OLSPANEL_DATA_DIR=/var/lib/olspanel
+Environment=OLSPANEL_LOG_DIR=/var/log/olspanel
+EnvironmentFile=-/etc/olspanel/olspanel.env
+User=root
+# Hardening (the daemon needs root for useradd/chown/OLS, but not much else)
+PrivateTmp=no
+ProtectSystem=full
+ReadWritePaths=/var/lib/olspanel /var/log/olspanel /home /usr/local/lsws/conf /usr/local/lsws/logs /etc/pure-ftpd /etc/ssl/private /var/spool/cron /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subuid /etc/subgid /run /tmp
+NoNewPrivileges=no
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

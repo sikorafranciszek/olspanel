@@ -1,0 +1,11 @@
+/bin/
+/dist/
+/web/node_modules/
+/web/dist/
+*.db
+*.db-wal
+*.db-shm
+.env
+*.log
+/internal/web/dist/
+/.dev/
