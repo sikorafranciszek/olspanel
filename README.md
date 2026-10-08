@@ -35,7 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/OWNER/olspanel/main/install.sh -o i
 sudo bash install.sh --hostname panel.example.com --email admin@example.com
 ```
 
-Opcje: `--admin-password`, `--php-versions "81 82 83 84"`, `--version vX.Y.Z`, `--skip-ftp`, `--enable-ufw`.
+Opcje: `--admin-password`, `--php-versions "81 82 83 84"`, `--version vX.Y.Z`, `--skip-ftp`, `--enable-ufw`, `--http-port 80`, `--https-port 443`.
+Instalator odmawia pracy, gdy porty 80/443/2222 zajmuje inny proces (podaj inne porty lub zatrzymaj usługę).
 
 Po instalacji panel działa pod `https://<ip>:2222/` (login `admin`, hasło wypisane na końcu i zapisane w `/root/.olspanel_credentials`).
 Instalator jest idempotentny: ponowne uruchomienie aktualizuje binarkę i migracje.
@@ -88,7 +89,7 @@ make test
 make linux checksums
 ```
 
-Zmienne środowiskowe: `OLSPANEL_LISTEN`, `OLSPANEL_DATA_DIR`, `OLSPANEL_LSWS_ROOT`, `OLSPANEL_HOME_ROOT`, `OLSPANEL_MYSQL_SOCKET`, `OLSPANEL_PMA_UPSTREAM`, `OLSPANEL_UPLOAD_MAX_MB`, `OLSPANEL_DEV_SPA`, `OLSPANEL_DEBUG`.
+Zmienne środowiskowe (`/etc/olspanel/olspanel.env`): `OLSPANEL_LISTEN`, `OLSPANEL_HTTP_PORT`, `OLSPANEL_HTTPS_PORT`, `OLSPANEL_INSECURE_HTTP`, `OLSPANEL_DATA_DIR`, `OLSPANEL_LSWS_ROOT`, `OLSPANEL_HOME_ROOT`, `OLSPANEL_MYSQL_SOCKET`, `OLSPANEL_PMA_UPSTREAM`, `OLSPANEL_UPLOAD_MAX_MB`, `OLSPANEL_DEV_SPA`, `OLSPANEL_DEBUG`.
 
 ### Test end-to-end instalatora (WSL2)
 
@@ -97,7 +98,7 @@ bash scripts/test-install-wsl.sh            # Ubuntu 24.04
 UBUNTU=26.04 bash scripts/test-install-wsl.sh
 ```
 
-Skrypt importuje świeży rootfs Ubuntu jako osobną dystrybucję WSL (`olspanel-test-2404`), uruchamia `install.sh --from-source`, a następnie `scripts/smoke.sh` tworzy przez API pakiet, użytkownika, domenę, bazę, konto FTP i cron, sprawdza je na poziomie systemu (PHP działa jako użytkownik, `openlitespeed -t`, `mysql`, `pure-pw`, `crontab -l`) i usuwa konto.
+Skrypt importuje świeży rootfs Ubuntu jako osobną dystrybucję WSL (`olspanel-test-2404`), uruchamia `install.sh --from-source --http-port 18080 --https-port 18443` (dystrybucje WSL2 dzielą stos sieciowy, więc porty 80/443/3306 mogą być zajęte przez inne dystrybucje lub Docker; MariaDB dostaje `skip-networking`), a następnie `scripts/smoke.sh` tworzy przez API pakiet, użytkownika, domenę, bazę, konto FTP i cron, sprawdza je na poziomie systemu (PHP działa jako użytkownik, `openlitespeed -t`, `mysql`, `pure-pw`, `crontab -l`) i usuwa konto.
 
 ## CLI
 

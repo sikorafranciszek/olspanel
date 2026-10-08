@@ -27,7 +27,8 @@ type Service struct {
 }
 
 func (s *Service) conn(ctx context.Context) (*sql.DB, error) {
-	dsn := fmt.Sprintf("root@unix(%s)/?charset=utf8mb4&parseTime=true&timeout=5s", s.Socket)
+	// interpolateParams: CREATE/ALTER/DROP USER and GRANT cannot be server-side prepared.
+	dsn := fmt.Sprintf("root@unix(%s)/?charset=utf8mb4&parseTime=true&timeout=5s&interpolateParams=true", s.Socket)
 	c, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err

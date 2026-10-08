@@ -12,10 +12,9 @@ Environment=OLSPANEL_DATA_DIR=/var/lib/olspanel
 Environment=OLSPANEL_LOG_DIR=/var/log/olspanel
 EnvironmentFile=-/etc/olspanel/olspanel.env
 User=root
-# Hardening (the daemon needs root for useradd/chown/OLS, but not much else)
+# The daemon manages system accounts (useradd needs lock files in /etc),
+# OLS config, crontabs and pure-ftpd, so it runs unconfined as root.
 PrivateTmp=no
-ProtectSystem=full
-ReadWritePaths=/var/lib/olspanel /var/log/olspanel /home /usr/local/lsws/conf /usr/local/lsws/logs /etc/pure-ftpd /etc/ssl/private /var/spool/cron /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subuid /etc/subgid /run /tmp
 NoNewPrivileges=no
 LimitNOFILE=65536
 

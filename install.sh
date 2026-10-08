@@ -5,6 +5,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/OWNER/olspanel/main/install.sh -o install.sh
 #   sudo bash install.sh [--hostname panel.example.com] [--admin-password ...] [--php-versions "81 82 83 84"]
 #                        [--from-source] [--version vX.Y.Z] [--skip-ftp] [--enable-ufw] [--email you@example.com]
+#                        [--http-port 80] [--https-port 443]
 #
 set -euo pipefail
 
@@ -25,6 +26,8 @@ VERSION="latest"
 SKIP_FTP=0
 ENABLE_UFW=0
 ACME_EMAIL=""
+HTTP_PORT=80
+HTTPS_PORT=443
 
 usage() {
   sed -n '2,8p' "$0"
@@ -41,6 +44,8 @@ while [[ $# -gt 0 ]]; do
     --skip-ftp) SKIP_FTP=1; shift ;;
     --enable-ufw) ENABLE_UFW=1; shift ;;
     --email) ACME_EMAIL="$2"; shift 2 ;;
+    --http-port) HTTP_PORT="$2"; shift 2 ;;
+    --https-port) HTTPS_PORT="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "Nieznana opcja: $1"; usage ;;
   esac
@@ -74,12 +79,32 @@ case "$ARCH" in amd64|arm64) ;; *) die "nieobsługiwana architektura: $ARCH" ;; 
 command -v systemctl >/dev/null || die "wymagany systemd"
 
 info "Ubuntu $VERSION_ID ($CODENAME), $ARCH"
+
+# An existing install keeps its ports (from the env file) unless overridden on the command line.
+if [[ -f /etc/olspanel/olspanel.env ]]; then
+  # shellcheck disable=SC1091
+  . /etc/olspanel/olspanel.env
+  [[ "$HTTP_PORT" == "80" ]] && HTTP_PORT="${OLSPANEL_HTTP_PORT:-80}"
+  [[ "$HTTPS_PORT" == "443" ]] && HTTPS_PORT="${OLSPANEL_HTTPS_PORT:-443}"
+fi
+
+# Ports must be free (or already held by OpenLiteSpeed / the panel from a previous run).
+port_owner() { # <port> -> process name or empty
+  ss -Hltnp "sport = :$1" 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -1
+}
+for p in "$HTTP_PORT" "$HTTPS_PORT" "$PANEL_PORT"; do
+  owner="$(port_owner "$p" || true)"
+  case "$owner" in
+    ""|openlitespeed|litespeed|lshttpd|olspanel) ;;
+    *) die "port $p jest zajęty przez '$owner'. Zatrzymaj tę usługę albo użyj --http-port/--https-port." ;;
+  esac
+done
 info "log instalacji: $LOG"
 
 # ---------------------------------------------------------------- base packages
 info "Instaluję pakiety bazowe"
 $APT update
-$APT install curl wget gnupg ca-certificates lsb-release unzip acl cron software-properties-common openssl
+$APT install curl wget gnupg ca-certificates lsb-release unzip acl cron software-properties-common openssl python3
 
 # ---------------------------------------------------------------- LiteSpeed repo
 if [[ ! -f /etc/apt/sources.list.d/litespeed.list ]]; then
@@ -203,6 +228,8 @@ else
   [[ -f "$PANEL_DIR/share/default/html/index.html" ]] || echo '<!doctype html><title>Serwer działa</title><h1>Serwer działa</h1><p>Ta domena nie jest przypisana do żadnego konta.</p>' > "$PANEL_DIR/share/default/html/index.html"
   [[ -f "$PANEL_DIR/share/suspended/index.html" ]] || echo '<!doctype html><title>Konto zawieszone</title><h1>Konto zawieszone</h1>' > "$PANEL_DIR/share/suspended/index.html"
 fi
+# OLS refuses docroots owned by uid < 11 (treats it as an error in -t), so hand them to nobody.
+chown -R nobody:nogroup "$PANEL_DIR/share"
 chmod -R a+rX "$PANEL_DIR/share"
 
 # ---------------------------------------------------------------- phpMyAdmin
@@ -238,14 +265,15 @@ declare(strict_types=1);
 \$cfg['Lang'] = 'pl';
 EOF
   mkdir -p /tmp/olspanel-pma && chown nobody:nogroup /tmp/olspanel-pma && chmod 700 /tmp/olspanel-pma
-  chown -R root:root "$PANEL_DIR/phpmyadmin"
   chmod -R a+rX "$PANEL_DIR/phpmyadmin"
 fi
+
+chown -R nobody:nogroup "$PANEL_DIR/phpmyadmin"
 
 # ---------------------------------------------------------------- OLS base config
 info "Konfiguruję OpenLiteSpeed"
 if ! grep -q 'conf/olspanel/\*.conf' "$LSWS/conf/httpd_config.conf"; then
-  cp -n "$LSWS/conf/httpd_config.conf" "$LSWS/conf/httpd_config.conf.pre-olspanel" || true
+  [[ -f "$LSWS/conf/httpd_config.conf.pre-olspanel" ]] || cp "$LSWS/conf/httpd_config.conf" "$LSWS/conf/httpd_config.conf.pre-olspanel"
   if [[ -f "$SRC_DIR/configs/ols/httpd_config.base.conf" ]]; then
     cp "$SRC_DIR/configs/ols/httpd_config.base.conf" "$LSWS/conf/httpd_config.conf"
   else
@@ -255,7 +283,12 @@ fi
 mkdir -p "$LSWS/conf/olspanel" "$LSWS/conf/vhosts"
 chown -R lsadm:lsadm "$LSWS/conf"
 
-# ---------------------------------------------------------------- panel init
+# ---------------------------------------------------------------- panel env + init
+cat > /etc/olspanel/olspanel.env <<EOF
+OLSPANEL_LISTEN=:${PANEL_PORT}
+OLSPANEL_HTTP_PORT=${HTTP_PORT}
+OLSPANEL_HTTPS_PORT=${HTTPS_PORT}
+EOF
 HOST_FQDN="${HOSTNAME_OPT:-$(hostname -f 2>/dev/null || hostname)}"
 GENERATED_PASS=0
 if [[ ! -f "$DATA_DIR/panel.db" && -z "$ADMIN_PASS" ]]; then
@@ -265,7 +298,7 @@ fi
 INIT_ARGS=(--hostname "$HOST_FQDN")
 [[ -n "$ADMIN_PASS" ]] && INIT_ARGS+=(--admin-password "$ADMIN_PASS")
 [[ -n "$ACME_EMAIL" ]] && INIT_ARGS+=(--email "$ACME_EMAIL")
-OLSPANEL_DATA_DIR="$DATA_DIR" OLSPANEL_LOG_DIR="$LOG_DIR" "$PANEL_DIR/bin/olspanel" init "${INIT_ARGS[@]}"
+OLSPANEL_DATA_DIR="$DATA_DIR" OLSPANEL_LOG_DIR="$LOG_DIR" OLSPANEL_HTTP_PORT="$HTTP_PORT" OLSPANEL_HTTPS_PORT="$HTTPS_PORT" "$PANEL_DIR/bin/olspanel" init "${INIT_ARGS[@]}"
 
 # pure-ftpd TLS cert = panel cert
 if [[ $SKIP_FTP -eq 0 ]]; then
@@ -282,14 +315,11 @@ if [[ -f "$SRC_DIR/configs/olspanel.service" ]]; then
 else
   curl -fsSL "https://raw.githubusercontent.com/${OLSPANEL_REPO}/main/configs/olspanel.service" -o /etc/systemd/system/olspanel.service
 fi
-[[ -f /etc/olspanel/olspanel.env ]] || cat > /etc/olspanel/olspanel.env <<EOF
-OLSPANEL_LISTEN=:${PANEL_PORT}
-EOF
 systemctl daemon-reload
 systemctl enable --now cron
-systemctl enable lsws
+systemctl enable lshttpd >/dev/null 2>&1 || true
 "$LSWS/bin/openlitespeed" -t || die "konfiguracja OpenLiteSpeed jest nieprawidłowa (zobacz $LSWS/logs/error.log)"
-systemctl restart lsws
+systemctl restart lshttpd
 systemctl enable olspanel
 systemctl restart olspanel
 
@@ -297,8 +327,8 @@ systemctl restart olspanel
 if command -v ufw >/dev/null && { [[ $ENABLE_UFW -eq 1 ]] || ufw status | grep -q "Status: active"; }; then
   info "Otwieram porty w ufw"
   ufw allow 22/tcp >/dev/null
-  ufw allow 80/tcp >/dev/null
-  ufw allow 443/tcp >/dev/null
+  ufw allow "${HTTP_PORT}"/tcp >/dev/null
+  ufw allow "${HTTPS_PORT}"/tcp >/dev/null
   ufw allow ${PANEL_PORT}/tcp >/dev/null
   if [[ $SKIP_FTP -eq 0 ]]; then ufw allow 21/tcp >/dev/null; ufw allow 30000:30100/tcp >/dev/null; fi
   [[ $ENABLE_UFW -eq 1 ]] && ufw --force enable >/dev/null
@@ -310,7 +340,7 @@ if ! curl -fsk "https://127.0.0.1:${PANEL_PORT}/api/v1/health" >/dev/null; then
   journalctl -u olspanel --no-pager -n 30 || true
   die "panel nie odpowiada na porcie ${PANEL_PORT}"
 fi
-"$PANEL_DIR/bin/olspanel" doctor || warn "doctor zgłosił braki (patrz wyżej)"
+OLSPANEL_HTTP_PORT="$HTTP_PORT" "$PANEL_DIR/bin/olspanel" doctor || warn "doctor zgłosił braki (patrz wyżej)"
 
 IP="$(curl -fs4 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
 if [[ $GENERATED_PASS -eq 1 ]]; then

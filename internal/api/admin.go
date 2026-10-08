@@ -47,18 +47,20 @@ func (s *Server) serverInfo(w http.ResponseWriter, r *http.Request) {
 		services = append(services, st)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"hostname":  hostname,
-		"version":   s.Version,
-		"go":        runtime.Version(),
-		"os":        runtime.GOOS + "/" + runtime.GOARCH,
-		"uptime_s":  int64(time.Since(s.Started).Seconds()),
-		"users":     usersN,
-		"domains":   len(domainsAll),
-		"packages":  len(pkgs),
-		"services":  services,
-		"php":       php.Installed(s.Cfg.LswsRoot),
-		"ols_ok":    s.Users.NoSystem || ols.Healthy(),
-		"resources": readResources(),
+		"hostname":   hostname,
+		"version":    s.Version,
+		"go":         runtime.Version(),
+		"os":         runtime.GOOS + "/" + runtime.GOARCH,
+		"uptime_s":   int64(time.Since(s.Started).Seconds()),
+		"users":      usersN,
+		"domains":    len(domainsAll),
+		"packages":   len(pkgs),
+		"services":   services,
+		"php":        php.Installed(s.Cfg.LswsRoot),
+		"ols_ok":     s.Users.NoSystem || ols.Healthy(s.Cfg.HTTPPort),
+		"http_port":  s.Cfg.HTTPPort,
+		"https_port": s.Cfg.HTTPSPort,
+		"resources":  readResources(),
 	})
 }
 

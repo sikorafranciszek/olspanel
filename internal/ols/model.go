@@ -39,4 +39,6 @@ type State struct {
 	PMAPhpBin   string // lsphp binary used for phpMyAdmin
 	SuspendRoot string // docroot shown for suspended accounts
 	DefaultRoot string // docroot for unmatched hosts
+	HTTPPort    int    // 0 = 80
+	HTTPSPort   int    // 0 = 443
 }

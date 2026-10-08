@@ -92,6 +92,15 @@ func firstACME(st *State) string {
 }
 
 func validateState(st *State) error {
+	if st.HTTPPort == 0 {
+		st.HTTPPort = 80
+	}
+	if st.HTTPSPort == 0 {
+		st.HTTPSPort = 443
+	}
+	if st.HTTPPort < 1 || st.HTTPPort > 65535 || st.HTTPSPort < 1 || st.HTTPSPort > 65535 || st.HTTPPort == st.HTTPSPort {
+		return fmt.Errorf("nieprawidłowe porty listenerów OLS")
+	}
 	for _, p := range []string{st.PanelCert, st.PanelKey, st.SuspendRoot, st.DefaultRoot} {
 		if !okPath(p) {
 			return fmt.Errorf("nieprawidłowa ścieżka w konfiguracji: %q", p)

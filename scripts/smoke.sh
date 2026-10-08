@@ -8,6 +8,8 @@
 set -euo pipefail
 
 BASE="${BASE:-https://127.0.0.1:2222}"
+HTTP_PORT="${HTTP_PORT:-80}"
+WEB="http://127.0.0.1:${HTTP_PORT}"
 command -v python3 >/dev/null || apt-get install -y -q python3 >/dev/null
 ADMIN_PASS="${ADMIN_PASS:-Test1234!}"
 JAR="$(mktemp)"
@@ -17,34 +19,40 @@ CSRF=""
 api() { # method path [json]
   local m="$1" p="$2" d="${3:-}"
   if [[ -n "$d" ]]; then
-    curl -fsk -b "$JAR" -c "$JAR" -X "$m" -H "Content-Type: application/json" -H "X-CSRF-Token: $CSRF" "$BASE/api/v1$p" -d "$d"
+    curl -sk --fail-with-body -b "$JAR" -c "$JAR" -X "$m" -H "Content-Type: application/json" -H "X-CSRF-Token: $CSRF" "$BASE/api/v1$p" -d "$d"
   else
-    curl -fsk -b "$JAR" -c "$JAR" -X "$m" -H "X-CSRF-Token: $CSRF" "$BASE/api/v1$p"
+    curl -sk --fail-with-body -b "$JAR" -c "$JAR" -X "$m" -H "X-CSRF-Token: $CSRF" "$BASE/api/v1$p"
   fi
 }
-json() { python3 -c "import sys,json; d=json.load(sys.stdin); print(eval('d$1'))"; }
+json() { python3 -c "import sys,json; print(json.load(sys.stdin)[sys.argv[1]])" "$1"; }
 step() { echo "--> $*"; }
 
 step "health"
 api GET /health | grep -q '"ok":true'
 
 step "login as admin"
-CSRF="$(api POST /auth/login "{\"username\":\"admin\",\"password\":\"$ADMIN_PASS\"}" | json "['csrf']")"
+CSRF="$(api POST /auth/login "{\"username\":\"admin\",\"password\":\"$ADMIN_PASS\"}" | json csrf)"
 [[ -n "$CSRF" ]]
 
+step "cleanup leftovers from previous runs"
+OLD_UID="$(api GET /admin/users | python3 -c 'import sys,json; print(next((u["id"] for u in json.load(sys.stdin) if u["username"]=="smoke1"),""))')"
+[[ -n "$OLD_UID" ]] && api DELETE "/admin/users/$OLD_UID" >/dev/null
+OLD_PKG="$(api GET /admin/packages | python3 -c 'import sys,json; print(next((p["id"] for p in json.load(sys.stdin) if p["name"]=="Smoke"),""))')"
+[[ -n "$OLD_PKG" ]] && api DELETE "/admin/packages/$OLD_PKG" >/dev/null
+
 step "create package"
-PKG="$(api POST /admin/packages '{"name":"Smoke","disk_mb":1024,"max_domains":2,"max_subdomains":2,"max_databases":2,"max_ftp":2,"max_cron":2,"php_versions":["'"$(ls -d /usr/local/lsws/lsphp?? | sort | tail -1 | sed 's#.*/lsphp##')"'"]}' | json "['id']")"
+PKG="$(api POST /admin/packages '{"name":"Smoke","disk_mb":1024,"max_domains":2,"max_subdomains":2,"max_databases":2,"max_ftp":2,"max_cron":2,"php_versions":["'"$(ls -d /usr/local/lsws/lsphp?? | sort | tail -1 | sed 's#.*/lsphp##')"'"]}' | json id)"
 
 step "create user smoke1"
-UID_="$(api POST /admin/users "{\"username\":\"smoke1\",\"password\":\"Smoke12345!\",\"email\":\"s@example.com\",\"role\":\"user\",\"package_id\":$PKG}" | json "['id']")"
+UID_="$(api POST /admin/users "{\"username\":\"smoke1\",\"password\":\"Smoke12345!\",\"email\":\"s@example.com\",\"role\":\"user\",\"package_id\":$PKG}" | json id)"
 id smoke1 >/dev/null
 [[ -d /home/smoke1/domains ]]
 
 step "impersonate user"
-CSRF="$(api POST "/admin/users/$UID_/impersonate" | json "['csrf']")"
+CSRF="$(api POST "/admin/users/$UID_/impersonate" | json csrf)"
 
 step "create domain"
-DOM="$(api POST /domains '{"name":"smoke.test","type":"domain"}' | json "['id']")"
+DOM="$(api POST /domains '{"name":"smoke.test","type":"domain"}' | json id)"
 [[ -f /usr/local/lsws/conf/vhosts/smoke.test/vhconf.conf ]]
 grep -q "map                     smoke.test smoke.test, www.smoke.test" /usr/local/lsws/conf/olspanel/20-listeners.conf
 /usr/local/lsws/bin/openlitespeed -t
@@ -53,15 +61,15 @@ step "PHP executes as the account user"
 echo '<?php echo "user=" . get_current_user() . " php=" . PHP_VERSION;' > /home/smoke1/domains/smoke.test/public_html/t.php
 chown smoke1:smoke1 /home/smoke1/domains/smoke.test/public_html/t.php
 sleep 1
-OUT="$(curl -fs -H 'Host: smoke.test' http://127.0.0.1/t.php)"
+OUT="$(curl -fs -H 'Host: smoke.test' "$WEB/t.php")"
 echo "    $OUT"
 echo "$OUT" | grep -q 'user=smoke1'
 
 step "static file served"
-curl -fs -H 'Host: smoke.test' http://127.0.0.1/ | grep -qi 'smoke.test'
+curl -fs -H 'Host: smoke.test' "$WEB/" | grep -qi 'smoke.test'
 
 step "create database + user"
-DBID="$(api POST /databases '{"suffix":"app"}' | json "['id']")"
+DBID="$(api POST /databases '{"suffix":"app"}' | json id)"
 api POST "/databases/$DBID/users" '{"suffix":"app","password":"DbPass12345!"}' >/dev/null
 mysql -u smoke1_app -pDbPass12345! -e 'SELECT 1' smoke1_app >/dev/null
 
@@ -82,7 +90,7 @@ api POST /files/mkdir '{"path":"domains/smoke.test/public_html/dir1"}' >/dev/nul
 ! api GET '/files?path=../../etc' >/dev/null 2>&1
 
 step "stop impersonation, delete user"
-CSRF="$(api POST /auth/stop-impersonation | json "['csrf']")"
+CSRF="$(api POST /auth/stop-impersonation | json csrf)"
 api DELETE "/admin/users/$UID_" >/dev/null
 ! id smoke1 >/dev/null 2>&1
 [[ ! -f /usr/local/lsws/conf/vhosts/smoke.test/vhconf.conf ]]

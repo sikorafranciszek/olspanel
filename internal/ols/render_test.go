@@ -78,6 +78,23 @@ func TestRenderProducesAllFiles(t *testing.T) {
 	}
 }
 
+func TestRenderCustomPorts(t *testing.T) {
+	st := sampleState()
+	st.HTTPPort, st.HTTPSPort = 18080, 18443
+	files, err := Render(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := files[FileListeners]
+	if !strings.Contains(l, "address                 *:18080") || !strings.Contains(l, "address                 *:18443") {
+		t.Errorf("custom ports not rendered:\n%s", l)
+	}
+	st.HTTPPort, st.HTTPSPort = 80, 80
+	if _, err := Render(st); err == nil {
+		t.Errorf("equal ports must be rejected")
+	}
+}
+
 func TestRenderSuspended(t *testing.T) {
 	st := sampleState()
 	st.VHosts[0].Suspended = true

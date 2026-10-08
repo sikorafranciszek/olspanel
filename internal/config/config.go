@@ -22,6 +22,8 @@ type Config struct {
 	DevMode      bool   // serve SPA from Vite dev server instead of embed
 	DevSPAOrigin string // http://localhost:5173
 	InsecureHTTP bool   // listen on plain HTTP (development only)
+	HTTPPort     int    // OLS HTTP listener port (default 80)
+	HTTPSPort    int    // OLS HTTPS listener port (default 443)
 }
 
 // FromEnv builds a Config from environment variables with sane defaults.
@@ -38,6 +40,8 @@ func FromEnv() Config {
 	}
 	c.DevMode = c.DevSPAOrigin != ""
 	c.InsecureHTTP = os.Getenv("OLSPANEL_INSECURE_HTTP") == "1"
+	c.HTTPPort = EnvInt("OLSPANEL_HTTP_PORT", 80)
+	c.HTTPSPort = EnvInt("OLSPANEL_HTTPS_PORT", 443)
 	c.DBPath = envOr("OLSPANEL_DB", filepath.Join(c.DataDir, "panel.db"))
 	c.PanelCert = envOr("OLSPANEL_TLS_CERT", filepath.Join(c.DataDir, "panel-ssl", "panel.crt"))
 	c.PanelKey = envOr("OLSPANEL_TLS_KEY", filepath.Join(c.DataDir, "panel-ssl", "panel.key"))

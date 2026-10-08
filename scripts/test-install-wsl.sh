@@ -39,11 +39,17 @@ WIN_ROOT="$(cygpath -w "$ROOT_DIR")"
 echo "==> copying repository into the distro"
 wsl.exe -d "$DISTRO" -u root -- bash -c "rm -rf /root/olspanel && mkdir -p /root/olspanel && cp -r \"\$(wslpath '$WIN_ROOT')\"/. /root/olspanel/ && rm -rf /root/olspanel/web/node_modules /root/olspanel/bin"
 
+# WSL2 distros share one network namespace with the host's other distros/Docker,
+# so keep MariaDB off TCP (the panel and phpMyAdmin use the unix socket anyway).
+wsl.exe -d "$DISTRO" -u root -- bash -c 'mkdir -p /etc/mysql/mariadb.conf.d && printf "[mysqld]
+skip-networking=1
+" > /etc/mysql/mariadb.conf.d/99-olspanel-test.cnf'
+
 echo "==> running install.sh --from-source"
-wsl.exe -d "$DISTRO" -u root -- bash -c 'cd /root/olspanel && bash install.sh --from-source --admin-password "Test1234!" --hostname panel.test --email test@example.com'
+wsl.exe -d "$DISTRO" -u root -- bash -c 'cd /root/olspanel && bash install.sh --from-source --admin-password "Test1234!" --hostname panel.test --email test@example.com --http-port 18080 --https-port 18443'
 
 echo "==> smoke test"
-wsl.exe -d "$DISTRO" -u root -- bash -c 'cd /root/olspanel && bash scripts/smoke.sh'
+wsl.exe -d "$DISTRO" -u root -- bash -c 'cd /root/olspanel && HTTP_PORT=18080 bash scripts/smoke.sh'
 
 if [[ "${KEEP:-0}" != "1" ]]; then
   echo "==> removing $DISTRO (set KEEP=1 to keep it)"

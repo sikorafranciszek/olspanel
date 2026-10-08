@@ -92,10 +92,11 @@ func build(ctx context.Context, cfg config.Config, noSystem bool) (*api.Server, 
 	if _, err := os.Stat(filepath.Join(pmaRoot, "index.php")); err != nil {
 		pmaRoot = ""
 	}
-	olsMgr := &ols.Manager{ConfDir: filepath.Join(cfg.LswsRoot, "conf"), DryRun: noSystem}
+	olsMgr := &ols.Manager{ConfDir: filepath.Join(cfg.LswsRoot, "conf"), DryRun: noSystem, HTTPPort: cfg.HTTPPort}
 	domainSvc := &domains.Service{
 		DB: database, OLS: olsMgr, LswsRoot: cfg.LswsRoot, DataDir: cfg.DataDir, ShareDir: shareDir,
 		PMARoot: pmaRoot, PanelCert: cfg.PanelCert, PanelKey: cfg.PanelKey, NoSystem: noSystem,
+		HTTPPort: cfg.HTTPPort, HTTPSPort: cfg.HTTPSPort,
 	}
 	olsMgr.Build = domainSvc.BuildState
 	mariaSvc := &mariadb.Service{DB: database, Socket: cfg.MySQLSocket, NoSystem: noSystem}
@@ -338,7 +339,7 @@ func doctor() error {
 	check("httpd_config include", includeConfigured(cfg.LswsRoot), "include $SERVER_ROOT/conf/olspanel/*.conf")
 	check("phpMyAdmin", fileExists("/usr/local/olspanel/phpmyadmin/index.php"), "/usr/local/olspanel/phpmyadmin")
 	if runtime.GOOS == "linux" {
-		check("OLS odpowiada na :80", ols.Healthy(), "")
+		check(fmt.Sprintf("OLS odpowiada na :%d", cfg.HTTPPort), ols.Healthy(cfg.HTTPPort), "")
 	}
 	if !ok {
 		return errors.New("niektóre wymagania nie są spełnione")

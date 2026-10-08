@@ -26,6 +26,8 @@ type Manager struct {
 	Build func(ctx context.Context) (*State, error)
 	// DryRun skips the syntax test and restart (for tests / non-Linux dev).
 	DryRun bool
+	// HTTPPort is the OLS HTTP listener port checked after restart (0 = 80).
+	HTTPPort int
 
 	mu       sync.Mutex
 	lsadmUID int
@@ -213,15 +215,20 @@ func (m *Manager) restart(ctx context.Context) error {
 	if _, err := system.Run(ctx, "lswsctrl", "", "restart"); err != nil {
 		return err
 	}
-	// Give the graceful restart a moment, then verify port 80 answers.
+	// Give the graceful restart a moment, then verify the HTTP listener answers.
+	port := m.HTTPPort
+	if port == 0 {
+		port = 80
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		if portOpen("127.0.0.1:80") {
+		if portOpen(addr) {
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return errors.New("OpenLiteSpeed nie odpowiada na porcie 80 po restarcie")
+	return fmt.Errorf("OpenLiteSpeed nie odpowiada na porcie %d po restarcie", port)
 }
 
 func portOpen(addr string) bool {
@@ -233,10 +240,13 @@ func portOpen(addr string) bool {
 	return true
 }
 
-// Healthy reports whether OLS serves HTTP on localhost.
-func Healthy() bool {
+// Healthy reports whether OLS serves HTTP on localhost at the given port (0 = 80).
+func Healthy(port int) bool {
+	if port == 0 {
+		port = 80
+	}
 	client := &http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get("http://127.0.0.1/")
+	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/", port))
 	if err != nil {
 		return false
 	}

@@ -29,6 +29,8 @@ type Service struct {
 	PMARoot   string // "" when phpMyAdmin is not installed
 	PanelCert string
 	PanelKey  string
+	HTTPPort  int
+	HTTPSPort int
 	NoSystem  bool
 }
 
@@ -268,6 +270,8 @@ func (s *Service) BuildState(ctx context.Context) (*ols.State, error) {
 		PMARoot:     s.PMARoot,
 		SuspendRoot: filepath.Join(s.ShareDir, "suspended"),
 		DefaultRoot: filepath.Join(s.ShareDir, "default"),
+		HTTPPort:    s.HTTPPort,
+		HTTPSPort:   s.HTTPSPort,
 	}
 	versions := php.Installed(s.LswsRoot)
 	if len(versions) > 0 {
