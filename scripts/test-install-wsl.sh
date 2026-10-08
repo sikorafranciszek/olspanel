@@ -18,11 +18,11 @@ WSL_BASE="${WSL_BASE:-$LOCALAPPDATA/olspanel-wsl}"
 mkdir -p "$WSL_BASE"
 
 case "$UBUNTU" in
-  24.04) ROOTFS_URL="https://cloud-images.ubuntu.com/wsl/releases/24.04/current/ubuntu-24.04-wsl-amd64.wsl" ;;
-  26.04) ROOTFS_URL="https://cloud-images.ubuntu.com/wsl/releases/26.04/current/ubuntu-26.04-wsl-amd64.wsl" ;;
+  24.04) ROOTFS_URL="https://cloud-images.ubuntu.com/wsl/releases/24.04/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz" ;;
+  26.04) ROOTFS_URL="${ROOTFS_URL:-https://cloud-images.ubuntu.com/wsl/releases/26.04/current/ubuntu-resolute-wsl-amd64-wsl.rootfs.tar.gz}" ;;
   *) echo "unsupported UBUNTU=$UBUNTU"; exit 1 ;;
 esac
-ROOTFS="$WSL_BASE/ubuntu-${UBUNTU}.wsl"
+ROOTFS="$WSL_BASE/ubuntu-${UBUNTU}-rootfs.tar.gz"
 
 if ! wsl.exe -l -q | tr -d '\r\0' | grep -qx "$DISTRO"; then
   if [[ ! -f "$ROOTFS" ]]; then

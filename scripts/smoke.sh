@@ -8,6 +8,7 @@
 set -euo pipefail
 
 BASE="${BASE:-https://127.0.0.1:2222}"
+command -v python3 >/dev/null || apt-get install -y -q python3 >/dev/null
 ADMIN_PASS="${ADMIN_PASS:-Test1234!}"
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT
