@@ -208,7 +208,7 @@ if [[ $FROM_SOURCE -eq 1 ]]; then
   (cd "$SRC_DIR" && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.Version=$(git -C "$SRC_DIR" describe --tags --always 2>/dev/null || echo source)" -o "$PANEL_DIR/bin/olspanel.new" ./cmd/olspanel)
 else
   if [[ "$VERSION" == "latest" ]]; then
-    VERSION="$(curl -fsSL "https://api.github.com/repos/${OLSPANEL_REPO}/releases/latest" | grep -oP '"tag_name":\s*"\K[^"]+')" || die "nie można pobrać informacji o wydaniu"
+    VERSION="$(curl -fsSL "https://api.github.com/repos/${OLSPANEL_REPO}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*//p' | head -1)"; [[ -n "$VERSION" ]] || die "nie można pobrać informacji o wydaniu"
   fi
   BASE="https://github.com/${OLSPANEL_REPO}/releases/download/${VERSION}"
   info "Pobieram olspanel ${VERSION} (${ARCH})"
