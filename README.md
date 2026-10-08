@@ -23,7 +23,7 @@ Poza MVP (plan): DNS, e-mail, backupy, limity transferu, 2FA, kwoty dyskowe jąd
 Na czystym serwerze Ubuntu 24.04 lub 26.04 (root):
 
 ```bash
-git clone https://github.com/OWNER/olspanel.git
+git clone https://github.com/sikorafranciszek/olspanel.git
 cd olspanel
 sudo bash install.sh --from-source --hostname panel.example.com --email admin@example.com
 ```
@@ -31,7 +31,7 @@ sudo bash install.sh --from-source --hostname panel.example.com --email admin@ex
 Lub z gotowej binarki z GitHub Releases (po opublikowaniu wydania):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/olspanel/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/sikorafranciszek/olspanel/main/install.sh -o install.sh
 sudo bash install.sh --hostname panel.example.com --email admin@example.com
 ```
 

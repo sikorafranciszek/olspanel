@@ -2,14 +2,14 @@
 #
 # olspanel installer for Ubuntu 24.04 / 26.04
 #
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/olspanel/main/install.sh -o install.sh
+#   curl -fsSL https://raw.githubusercontent.com/sikorafranciszek/olspanel/main/install.sh -o install.sh
 #   sudo bash install.sh [--hostname panel.example.com] [--admin-password ...] [--php-versions "81 82 83 84"]
 #                        [--from-source] [--version vX.Y.Z] [--skip-ftp] [--enable-ufw] [--email you@example.com]
 #                        [--http-port 80] [--https-port 443]
 #
 set -euo pipefail
 
-OLSPANEL_REPO="${OLSPANEL_REPO:-OWNER/olspanel}"
+OLSPANEL_REPO="${OLSPANEL_REPO:-sikorafranciszek/olspanel}"
 PANEL_DIR=/usr/local/olspanel
 DATA_DIR=/var/lib/olspanel
 LOG_DIR=/var/log/olspanel
