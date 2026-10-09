@@ -22,7 +22,7 @@ HOSTNAME_OPT=""
 ADMIN_PASS=""
 PHP_VERSIONS="81 82 83 84"
 FROM_SOURCE=0
-VERSION="latest"
+RELEASE_VERSION="latest"
 SKIP_FTP=0
 ENABLE_UFW=0
 ACME_EMAIL=""
@@ -40,7 +40,7 @@ while [[ $# -gt 0 ]]; do
     --admin-password) ADMIN_PASS="$2"; shift 2 ;;
     --php-versions) PHP_VERSIONS="$2"; shift 2 ;;
     --from-source) FROM_SOURCE=1; shift ;;
-    --version) VERSION="$2"; shift 2 ;;
+    --version) RELEASE_VERSION="$2"; shift 2 ;;
     --skip-ftp) SKIP_FTP=1; shift ;;
     --enable-ufw) ENABLE_UFW=1; shift ;;
     --email) ACME_EMAIL="$2"; shift 2 ;;
@@ -207,11 +207,11 @@ if [[ $FROM_SOURCE -eq 1 ]]; then
   info "Buduję olspanel"
   (cd "$SRC_DIR" && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.Version=$(git -C "$SRC_DIR" describe --tags --always 2>/dev/null || echo source)" -o "$PANEL_DIR/bin/olspanel.new" ./cmd/olspanel)
 else
-  if [[ "$VERSION" == "latest" ]]; then
-    VERSION="$(curl -fsSL "https://api.github.com/repos/${OLSPANEL_REPO}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"; [[ -n "$VERSION" ]] || die "nie można pobrać informacji o wydaniu"
+  if [[ "$RELEASE_VERSION" == "latest" ]]; then
+    RELEASE_VERSION="$(curl -fsSL "https://api.github.com/repos/${OLSPANEL_REPO}/releases/latest" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"; [[ -n "$RELEASE_VERSION" ]] || die "nie można pobrać informacji o wydaniu"
   fi
-  BASE="https://github.com/${OLSPANEL_REPO}/releases/download/${VERSION}"
-  info "Pobieram olspanel ${VERSION} (${ARCH})"
+  BASE="https://github.com/${OLSPANEL_REPO}/releases/download/${RELEASE_VERSION}"
+  info "Pobieram olspanel ${RELEASE_VERSION} (${ARCH})"
   curl -fsSL "${BASE}/olspanel-linux-${ARCH}" -o "$PANEL_DIR/bin/olspanel.new"
   curl -fsSL "${BASE}/SHA256SUMS" -o /tmp/olspanel.sums
   (cd "$PANEL_DIR/bin" && grep "olspanel-linux-${ARCH}\$" /tmp/olspanel.sums | sed "s#olspanel-linux-${ARCH}#olspanel.new#" | sha256sum -c -) || die "suma kontrolna binarki nie zgadza się"
